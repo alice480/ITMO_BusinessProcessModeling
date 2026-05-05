@@ -1,0 +1,442 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Операционные метрики</title>
+    <style>
+        :root {
+            --bg-color: #F6F8FB;
+            --card-bg: #FFFFFF;
+            --text-main: #1F2937;
+            --text-secondary: #64748B;
+            --accent: #2563EB;
+            --accent-extra: #14B8A6;
+            --status-ok: #16A34A;
+            --status-warn: #F59E0B;
+            --status-crit: #DC2626;
+            --border: #E5E7EB;
+            --grid: #EEF2F7;
+        }
+        * { box-sizing: border-box; }
+        html, body { min-height: 100%; overflow-y: auto; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 24px;
+        }
+        .container { max-width: 1600px; margin: 0 auto; }
+        header {
+            margin-bottom: 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            gap: 24px;
+        }
+        h1 { font-size: 28px; margin: 0 0 8px 0; }
+        .meta { font-size: 14px; color: var(--text-secondary); }
+        .filters {
+            display: flex;
+            gap: 12px;
+            background: var(--card-bg);
+            padding: 16px 24px;
+            border-radius: 12px;
+            margin-bottom: 24px;
+            border: 1px solid var(--border);
+            flex-wrap: wrap;
+        }
+        .filter-item { display: flex; flex-direction: column; gap: 4px; }
+        .filter-label { font-size: 12px; color: var(--text-secondary); font-weight: 600; }
+        .filter-value { font-size: 14px; border: 1px solid var(--border); padding: 6px 12px; border-radius: 6px; background: #fff; min-width: 135px; }
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(220px, 1fr));
+            gap: 20px;
+            margin-bottom: 24px;
+        }
+        .card {
+            background: var(--card-bg);
+            border-radius: 16px;
+            padding: 20px;
+            border: 1px solid var(--border);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+        .kpi-title { font-size: 13px; color: var(--text-secondary); margin-bottom: 8px; min-height: 32px; }
+        .kpi-value { font-size: 30px; font-weight: 700; margin-bottom: 4px; }
+        .kpi-change { font-size: 13px; margin-bottom: 8px; }
+        .up { color: var(--status-ok); }
+        .down { color: var(--status-crit); }
+        .warn { color: var(--status-warn); }
+        .status-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 100px;
+            font-size: 11px;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+        .status-ok { background: #DCFCE7; color: var(--status-ok); }
+        .status-warn { background: #FEF3C7; color: var(--status-warn); }
+        .status-crit { background: #FEE2E2; color: var(--status-crit); }
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 24px;
+            margin-bottom: 24px;
+        }
+        .chart-card {
+            background: var(--card-bg);
+            border-radius: 16px;
+            padding: 24px;
+            border: 1px solid var(--border);
+            min-height: 430px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+        .full-width { grid-column: span 2; min-height: 430px; }
+        .chart-title { font-size: 16px; font-weight: 600; margin-bottom: 10px; }
+        .legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 14px;
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-bottom: 10px;
+        }
+        .legend-item { display: flex; align-items: center; gap: 6px; }
+        .legend-marker { width: 11px; height: 11px; border-radius: 2px; flex: 0 0 auto; }
+        .svg-container { width: 100%; height: 320px; }
+        .svg-container.compact { height: 290px; }
+        svg { width: 100%; height: 100%; display: block; }
+        .axis-label { font-size: 12px; fill: var(--text-secondary); }
+        .axis-title { font-size: 12px; fill: var(--text-secondary); font-weight: 500; }
+        .value-label { font-size: 12px; fill: var(--text-main); font-weight: 600; }
+        .small-label { font-size: 11px; fill: var(--text-secondary); }
+        .grid-line { stroke: var(--grid); stroke-width: 1; }
+        .axis-line { stroke: #CBD5E1; stroke-width: 1.2; }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+            min-width: 1080px;
+        }
+        th { text-align: left; padding: 12px; border-bottom: 2px solid var(--border); color: var(--text-secondary); font-weight: 600; }
+        td { padding: 12px; border-bottom: 1px solid var(--border); vertical-align: top; }
+        .table-card { margin-top: 24px; overflow-x: auto; }
+        .positive { color: var(--status-ok); font-weight: 600; }
+        .negative { color: var(--status-crit); font-weight: 600; }
+        .warning { color: var(--status-warn); font-weight: 600; }
+        @media (max-width: 1200px) {
+            .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+            .charts-grid { grid-template-columns: 1fr; }
+            .full-width { grid-column: span 1; }
+        }
+        @media (max-width: 760px) {
+            body { padding: 16px; }
+            header { align-items: flex-start; flex-direction: column; }
+            .kpi-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div>
+                <h1>Операционные метрики</h1>
+                <div class="meta">Мониторинг: ежедневно | 05.05.2026</div>
+            </div>
+            <div class="meta">Данные обновлены: сегодня, 09:15</div>
+        </header>
+
+        <div class="filters">
+            <div class="filter-item"><span class="filter-label">Период</span><div class="filter-value">05.05.2026</div></div>
+            <div class="filter-item"><span class="filter-label">Туроператор</span><div class="filter-value">Все</div></div>
+            <div class="filter-item"><span class="filter-label">Канал обращения</span><div class="filter-value">Все</div></div>
+            <div class="filter-item"><span class="filter-label">Тип инцидента</span><div class="filter-value">Все</div></div>
+            <div class="filter-item"><span class="filter-label">Тип заказа</span><div class="filter-value">Все</div></div>
+        </div>
+
+        <div class="kpi-grid">
+            <div class="card">
+                <div class="kpi-title">SLA выдачи документов</div>
+                <div class="kpi-value">96%</div>
+                <div class="kpi-change up">▲ +1 п.п. к предыдущему дню</div>
+                <div class="status-badge status-ok">Норма</div>
+            </div>
+            <div class="card">
+                <div class="kpi-title">FRT</div>
+                <div class="kpi-value">8 мин</div>
+                <div class="kpi-change up">▼ -2 мин к предыдущему дню</div>
+                <div class="status-badge status-ok">Норма</div>
+            </div>
+            <div class="card">
+                <div class="kpi-title">MTTR</div>
+                <div class="kpi-value">3,6 ч</div>
+                <div class="kpi-change warn">▲ +0,4 ч к предыдущему дню</div>
+                <div class="status-badge status-ok">Норма</div>
+            </div>
+            <div class="card">
+                <div class="kpi-title">Открытые инциденты</div>
+                <div class="kpi-value">14</div>
+                <div class="kpi-change down">▲ +3 к предыдущему дню</div>
+                <div class="status-badge status-warn">Зона внимания</div>
+            </div>
+        </div>
+
+        <div class="charts-grid">
+            <div class="chart-card">
+                <div class="chart-title">Динамика SLA выдачи документов</div>
+                <div class="legend"><div class="legend-item"><span class="legend-marker" style="background:#2563EB"></span>SLA, %</div><div class="legend-item"><span class="legend-marker" style="background:#94A3B8"></span>Цель 95%</div></div>
+                <div id="sla-dynamics" class="svg-container"></div>
+            </div>
+
+            <div class="chart-card">
+                <div class="chart-title">SLA: срочные и плановые заказы</div>
+                <div class="legend"><div class="legend-item"><span class="legend-marker" style="background:#F59E0B"></span>Срочные: 91%</div><div class="legend-item"><span class="legend-marker" style="background:#16A34A"></span>Плановые: 97%</div></div>
+                <div id="sla-order-type" class="svg-container compact"></div>
+            </div>
+
+            <div class="chart-card">
+                <div class="chart-title">Динамика FRT</div>
+                <div class="legend"><div class="legend-item"><span class="legend-marker" style="background:#2563EB"></span>FRT, мин</div><div class="legend-item"><span class="legend-marker" style="background:#94A3B8"></span>Цель 10 мин</div></div>
+                <div id="frt-dynamics" class="svg-container"></div>
+            </div>
+
+            <div class="chart-card">
+                <div class="chart-title">Динамика MTTR</div>
+                <div class="legend"><div class="legend-item"><span class="legend-marker" style="background:#14B8A6"></span>MTTR, ч</div><div class="legend-item"><span class="legend-marker" style="background:#94A3B8"></span>Цель 4 ч</div></div>
+                <div id="mttr-dynamics" class="svg-container"></div>
+            </div>
+
+            <div class="chart-card">
+                <div class="chart-title">SLA выдачи документов по туроператорам</div>
+                <div id="sla-operators" class="svg-container"></div>
+            </div>
+
+            <div class="chart-card">
+                <div class="chart-title">FRT по каналам обращения</div>
+                <div id="frt-channels" class="svg-container"></div>
+            </div>
+
+            <div class="chart-card">
+                <div class="chart-title">FRT: срочные и остальные обращения</div>
+                <div id="frt-order-type" class="svg-container"></div>
+            </div>
+
+            <div class="chart-card">
+                <div class="chart-title">MTTR по типам инцидентов</div>
+                <div id="mttr-incident-types" class="svg-container"></div>
+            </div>
+        </div>
+
+        <div class="card table-card">
+            <div class="chart-title" style="margin-bottom: 16px;">Журнал критических инцидентов</div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Тип инцидента</th>
+                        <th>Туроператор</th>
+                        <th>Время открытия</th>
+                        <th>Длительность</th>
+                        <th>SLA-статус</th>
+                        <th>Ответственный</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td>INC-9012</td><td>Ошибка API туроператора</td><td>Coral Travel</td><td>09:45</td><td>1 ч 20 мин</td><td><span class="status-badge status-crit">Нарушен SLA</span></td><td>Операционный менеджер</td></tr>
+                    <tr><td>INC-9015</td><td>Задержка подтверждения оплаты</td><td>Anex Tour</td><td>11:20</td><td>45 мин</td><td><span class="status-badge status-warn">Требуется анализ</span></td><td>Специалист платежей</td></tr>
+                    <tr><td>INC-9020</td><td>Ошибка выписки ваучера</td><td>Tez Tour</td><td>14:10</td><td>15 мин</td><td><span class="status-badge status-ok">Норма</span></td><td>Back-office поддержка</td></tr>
+                    <tr><td>INC-9024</td><td>Зависший заказ</td><td>Biblio Globus</td><td>15:05</td><td>2 ч 10 мин</td><td><span class="status-badge status-warn">Зона внимания</span></td><td>Руководитель смены</td></tr>
+                    <tr><td>INC-9027</td><td>Задержка документов</td><td>Fun&Sun</td><td>16:30</td><td>35 мин</td><td><span class="status-badge status-ok">Норма</span></td><td>Документный контроль</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+<script>
+const COLORS = {
+    blue: '#2563EB', teal: '#14B8A6', green: '#16A34A', orange: '#F59E0B', red: '#DC2626',
+    gray: '#94A3B8', grid: '#EEF2F7', axis: '#CBD5E1', text: '#1F2937', muted: '#64748B'
+};
+function formatRu(value) { return String(value).replace('.', ','); }
+
+function renderLineChart(id, { maxY, ticks, yTitle, labels, series, target }) {
+    const el = document.getElementById(id);
+    const w = 760, h = 320, pl = 72, pr = 32, pt = 28, pb = 66;
+    const pw = w - pl - pr;
+    const ph = h - pt - pb;
+    const xStep = pw / Math.max(1, labels.length - 1);
+    let svg = `<svg viewBox="0 0 ${w} ${h}" role="img">`;
+    for (let i = 0; i <= ticks; i++) {
+        const val = maxY - (maxY / ticks) * i;
+        const y = pt + (ph / ticks) * i;
+        svg += `<line x1="${pl}" y1="${y}" x2="${w - pr}" y2="${y}" stroke="${COLORS.grid}"/>`;
+        svg += `<text x="${pl - 10}" y="${y + 4}" text-anchor="end" class="axis-label">${formatRu(Number(val.toFixed(1)))}</text>`;
+    }
+    svg += `<line x1="${pl}" y1="${pt}" x2="${pl}" y2="${h - pb}" class="axis-line"/>`;
+    svg += `<line x1="${pl}" y1="${h - pb}" x2="${w - pr}" y2="${h - pb}" class="axis-line"/>`;
+    svg += `<text x="24" y="${pt + ph / 2}" transform="rotate(-90 24 ${pt + ph / 2})" text-anchor="middle" class="axis-title">${yTitle}</text>`;
+    labels.forEach((label, i) => {
+        const x = pl + xStep * i;
+        svg += `<text x="${x}" y="${h - 34}" text-anchor="middle" class="axis-label">${label}</text>`;
+    });
+    if (target) {
+        const ty = h - pb - (target.value / maxY) * ph;
+        svg += `<line x1="${pl}" y1="${ty}" x2="${w - pr}" y2="${ty}" stroke="${COLORS.gray}" stroke-dasharray="7 5" stroke-width="2"/>`;
+    }
+    series.forEach(s => {
+        const points = s.values.map((v, i) => `${pl + xStep * i},${h - pb - (v / maxY) * ph}`).join(' ');
+        svg += `<polyline points="${points}" fill="none" stroke="${s.color}" stroke-width="3.2"/>`;
+        s.values.forEach((v, i) => {
+            const x = pl + xStep * i;
+            const y = h - pb - (v / maxY) * ph;
+            svg += `<circle cx="${x}" cy="${y}" r="4" fill="${s.color}"/>`;
+        });
+    });
+    svg += `</svg>`;
+    el.innerHTML = svg;
+}
+
+function renderBarChart(id, { maxY, ticks, yTitle, labels, values, color, valueSuffix = '%', rotateLabels = false, target }) {
+    const el = document.getElementById(id);
+    const w = 760, h = 320, pl = 76, pr = 28, pt = 26, pb = rotateLabels ? 82 : 58;
+    const pw = w - pl - pr;
+    const ph = h - pt - pb;
+    const step = pw / labels.length;
+    const bw = Math.min(54, step * 0.52);
+    let svg = `<svg viewBox="0 0 ${w} ${h}" role="img">`;
+    for (let i = 0; i <= ticks; i++) {
+        const val = maxY - (maxY / ticks) * i;
+        const y = pt + (ph / ticks) * i;
+        svg += `<line x1="${pl}" y1="${y}" x2="${w - pr}" y2="${y}" stroke="${COLORS.grid}"/>`;
+        svg += `<text x="${pl - 10}" y="${y + 4}" text-anchor="end" class="axis-label">${formatRu(Number(val.toFixed(1)))}</text>`;
+    }
+    svg += `<line x1="${pl}" y1="${pt}" x2="${pl}" y2="${h - pb}" class="axis-line"/>`;
+    svg += `<line x1="${pl}" y1="${h - pb}" x2="${w - pr}" y2="${h - pb}" class="axis-line"/>`;
+    svg += `<text x="24" y="${pt + ph / 2}" transform="rotate(-90 24 ${pt + ph / 2})" text-anchor="middle" class="axis-title">${yTitle}</text>`;
+    if (target) {
+        const ty = h - pb - (target.value / maxY) * ph;
+        svg += `<line x1="${pl}" y1="${ty}" x2="${w - pr}" y2="${ty}" stroke="${COLORS.gray}" stroke-dasharray="7 5" stroke-width="2"/>`;
+    }
+    labels.forEach((label, i) => {
+        const x = pl + step * i + (step - bw) / 2;
+        const bh = (values[i] / maxY) * ph;
+        const y = h - pb - bh;
+        const cx = x + bw / 2;
+        svg += `<rect x="${x}" y="${y}" width="${bw}" height="${bh}" fill="${color}" rx="4"/>`;
+        svg += `<text x="${cx}" y="${y - 8}" text-anchor="middle" class="value-label">${formatRu(values[i])}${valueSuffix}</text>`;
+        if (rotateLabels) {
+            svg += `<text x="${cx}" y="${h - pb + 18}" transform="rotate(-28 ${cx} ${h - pb + 18})" text-anchor="end" class="axis-label">${label}</text>`;
+        } else {
+            svg += `<text x="${cx}" y="${h - pb + 24}" text-anchor="middle" class="axis-label">${label}</text>`;
+        }
+    });
+    svg += `</svg>`;
+    el.innerHTML = svg;
+}
+
+function renderHorizontalBarChart(id, { maxX, ticks, xTitle, labels, values, color, valueSuffix = '' }) {
+    const el = document.getElementById(id);
+    const w = 760, h = 320, pl = 150, pr = 46, pt = 28, pb = 50;
+    const pw = w - pl - pr;
+    const ph = h - pt - pb;
+    const step = ph / labels.length;
+    const bh = Math.min(36, step * 0.55);
+    let svg = `<svg viewBox="0 0 ${w} ${h}" role="img">`;
+    for (let i = 0; i <= ticks; i++) {
+        const val = (maxX / ticks) * i;
+        const x = pl + (pw / ticks) * i;
+        svg += `<line x1="${x}" y1="${pt}" x2="${x}" y2="${h - pb}" stroke="${COLORS.grid}"/>`;
+        svg += `<text x="${x}" y="${h - 22}" text-anchor="middle" class="axis-label">${formatRu(Number(val.toFixed(0)))}</text>`;
+    }
+    svg += `<line x1="${pl}" y1="${pt}" x2="${pl}" y2="${h - pb}" class="axis-line"/>`;
+    svg += `<line x1="${pl}" y1="${h - pb}" x2="${w - pr}" y2="${h - pb}" class="axis-line"/>`;
+    svg += `<text x="${pl + pw / 2}" y="${h - 2}" text-anchor="middle" class="axis-title">${xTitle}</text>`;
+    labels.forEach((label, i) => {
+        const y = pt + step * i + (step - bh) / 2;
+        const bw = (values[i] / maxX) * pw;
+        svg += `<text x="${pl - 12}" y="${y + bh / 2 + 4}" text-anchor="end" class="axis-label">${label}</text>`;
+        svg += `<rect x="${pl}" y="${y}" width="${bw}" height="${bh}" fill="${color}" rx="4"/>`;
+        svg += `<text x="${pl + bw + 8}" y="${y + bh / 2 + 4}" class="value-label">${formatRu(values[i])}${valueSuffix}</text>`;
+    });
+    svg += `</svg>`;
+    el.innerHTML = svg;
+}
+
+function renderRadialPair(id, { items, maxValue = 100, unit = '%' }) {
+    const el = document.getElementById(id);
+    const w = 760, h = 290;
+    let svg = `<svg viewBox="0 0 ${w} ${h}" role="img">`;
+    items.forEach((item, i) => {
+        const cx = i === 0 ? 250 : 510;
+        const cy = 128;
+        const r = 72;
+        const circumference = 2 * Math.PI * r;
+        const pct = Math.max(0, Math.min(1, item.value / maxValue));
+        const dash = circumference * pct;
+        svg += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#E5E7EB" stroke-width="26"/>`;
+        svg += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${item.color}" stroke-width="26" stroke-linecap="round" stroke-dasharray="${dash} ${circumference}" transform="rotate(-90 ${cx} ${cy})"/>`;
+        svg += `<circle cx="${cx}" cy="${cy}" r="46" fill="#FFFFFF"/>`;
+        svg += `<text x="${cx}" y="${cy - 2}" font-size="26" font-weight="700" text-anchor="middle" fill="#1F2937">${formatRu(item.value)}${unit}</text>`;
+        svg += `<text x="${cx}" y="${cy + 22}" font-size="12" text-anchor="middle" fill="#64748B">${item.label}</text>`;
+        svg += `<text x="${cx}" y="${cy + 112}" class="axis-label" text-anchor="middle">${item.description}</text>`;
+    });
+    svg += `</svg>`;
+    el.innerHTML = svg;
+}
+
+renderLineChart('sla-dynamics', {
+    maxY: 100, ticks: 5, yTitle: 'SLA, %',
+    labels: ['29.04', '30.04', '01.05', '02.05', '03.05', '04.05', '05.05'],
+    series: [{ values: [94, 95, 97, 98, 95, 97, 96], color: COLORS.blue }],
+    target: { value: 95 }
+});
+renderRadialPair('sla-order-type', {
+    maxValue: 100,
+    unit: '%',
+    items: [
+        { label: 'Срочные', description: 'SLA по срочным заказам', value: 91, color: COLORS.orange },
+        { label: 'Плановые', description: 'SLA по плановым заказам', value: 97, color: COLORS.green }
+    ]
+});
+renderLineChart('frt-dynamics', {
+    maxY: 25, ticks: 5, yTitle: 'FRT, мин',
+    labels: ['29.04', '30.04', '01.05', '02.05', '03.05', '04.05', '05.05'],
+    series: [{ values: [12, 11, 10, 9, 12, 10, 8], color: COLORS.blue }],
+    target: { value: 10 }
+});
+renderLineChart('mttr-dynamics', {
+    maxY: 8, ticks: 4, yTitle: 'MTTR, ч',
+    labels: ['29.04', '30.04', '01.05', '02.05', '03.05', '04.05', '05.05'],
+    series: [{ values: [4.2, 4.0, 3.8, 3.5, 3.1, 3.2, 3.6], color: COLORS.teal }],
+    target: { value: 4 }
+});
+renderBarChart('sla-operators', {
+    maxY: 100, ticks: 5, yTitle: 'SLA, %',
+    labels: ['Anex Tour', 'Coral Travel', 'Pegas Touristik', 'Tez Tour', 'Biblio Globus'],
+    values: [97, 92, 95, 94, 98],
+    color: COLORS.blue, valueSuffix: '%', rotateLabels: true, target: { value: 95 }
+});
+renderHorizontalBarChart('frt-channels', {
+    maxX: 50, ticks: 5, xTitle: 'FRT, мин',
+    labels: ['Чат', 'Email', 'Телефон', 'Мессенджер'],
+    values: [8, 45, 5, 14],
+    color: COLORS.blue, valueSuffix: ' мин'
+});
+renderBarChart('frt-order-type', {
+    maxY: 25, ticks: 5, yTitle: 'FRT, мин',
+    labels: ['Срочные', 'Остальные'],
+    values: [5, 9],
+    color: COLORS.orange, valueSuffix: ' мин', target: { value: 10 }
+});
+renderBarChart('mttr-incident-types', {
+    maxY: 8, ticks: 4, yTitle: 'MTTR, ч',
+    labels: ['Оплата', 'Документы', 'Подтверждение', 'Зависший заказ'],
+    values: [5.1, 2.8, 4.4, 6.2],
+    color: COLORS.teal, valueSuffix: ' ч', rotateLabels: true, target: { value: 4 }
+});
+</script>
+</body>
+</html>

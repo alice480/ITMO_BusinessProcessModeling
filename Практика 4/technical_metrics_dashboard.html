@@ -1,0 +1,526 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Технические метрики</title>
+    <style>
+        :root {
+            --bg-color: #F6F8FB;
+            --card-bg: #FFFFFF;
+            --text-main: #1F2937;
+            --text-secondary: #64748B;
+            --accent: #2563EB;
+            --accent-extra: #14B8A6;
+            --status-ok: #16A34A;
+            --status-warn: #F59E0B;
+            --status-crit: #DC2626;
+            --border: #E5E7EB;
+            --grid: #EEF2F7;
+        }
+
+        * { box-sizing: border-box; }
+        html, body { min-height: 100%; overflow-y: auto; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 24px;
+        }
+
+        .container { max-width: 1600px; margin: 0 auto; }
+
+        header {
+            margin-bottom: 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            gap: 24px;
+        }
+
+        h1 { font-size: 28px; margin: 0 0 8px 0; }
+        .meta { font-size: 14px; color: var(--text-secondary); line-height: 1.45; }
+
+        .filters {
+            display: flex;
+            gap: 12px;
+            background: var(--card-bg);
+            padding: 16px 24px;
+            border-radius: 12px;
+            margin-bottom: 24px;
+            border: 1px solid var(--border);
+            flex-wrap: wrap;
+        }
+
+        .filter-item { display: flex; flex-direction: column; gap: 4px; }
+        .filter-label { font-size: 12px; color: var(--text-secondary); font-weight: 600; }
+        .filter-value { font-size: 14px; border: 1px solid var(--border); padding: 6px 12px; border-radius: 6px; background: #fff; min-width: 145px; }
+
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(220px, 1fr));
+            gap: 20px;
+            margin-bottom: 24px;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: 16px;
+            padding: 20px;
+            border: 1px solid var(--border);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+
+        .kpi-title { font-size: 13px; color: var(--text-secondary); margin-bottom: 8px; min-height: 32px; }
+        .kpi-value { font-size: 28px; font-weight: 700; margin-bottom: 4px; }
+        .kpi-change { font-size: 13px; margin-bottom: 6px; }
+        .kpi-frequency { font-size: 12px; color: var(--text-secondary); margin-bottom: 8px; }
+        .up { color: var(--status-ok); }
+        .down { color: var(--status-crit); }
+        .warn { color: var(--status-warn); }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 100px;
+            font-size: 11px;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .status-ok { background: #DCFCE7; color: var(--status-ok); }
+        .status-warn { background: #FEF3C7; color: var(--status-warn); }
+        .status-crit { background: #FEE2E2; color: var(--status-crit); }
+
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 24px;
+            margin-bottom: 24px;
+        }
+
+        .chart-card {
+            background: var(--card-bg);
+            border-radius: 16px;
+            padding: 24px;
+            border: 1px solid var(--border);
+            min-height: 430px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+
+        .chart-title { font-size: 16px; font-weight: 600; margin-bottom: 10px; }
+        .chart-subtitle { font-size: 12px; color: var(--text-secondary); margin: -4px 0 12px 0; }
+
+        .legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 14px;
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-bottom: 10px;
+        }
+
+        .legend-item { display: flex; align-items: center; gap: 6px; }
+        .legend-marker { width: 11px; height: 11px; border-radius: 2px; flex: 0 0 auto; }
+
+        .svg-container { width: 100%; height: 320px; }
+        .svg-container.compact { height: 300px; }
+        svg { width: 100%; height: 100%; display: block; }
+
+        .axis-label { font-size: 12px; fill: var(--text-secondary); }
+        .axis-title { font-size: 12px; fill: var(--text-secondary); font-weight: 500; }
+        .value-label { font-size: 12px; fill: var(--text-main); font-weight: 600; }
+        .small-label { font-size: 11px; fill: var(--text-secondary); }
+        .axis-line { stroke: #CBD5E1; stroke-width: 1.2; }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+            min-width: 1100px;
+        }
+
+        th {
+            text-align: left;
+            padding: 12px;
+            border-bottom: 2px solid var(--border);
+            color: var(--text-secondary);
+            font-weight: 600;
+        }
+
+        td {
+            padding: 12px;
+            border-bottom: 1px solid var(--border);
+            vertical-align: top;
+        }
+
+        .table-card { margin-top: 24px; overflow-x: auto; }
+        .positive { color: var(--status-ok); font-weight: 600; }
+        .negative { color: var(--status-crit); font-weight: 600; }
+        .warning { color: var(--status-warn); font-weight: 600; }
+
+        @media (max-width: 1200px) {
+            .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+            .charts-grid { grid-template-columns: 1fr; }
+        }
+
+        @media (max-width: 760px) {
+            body { padding: 16px; }
+            header { align-items: flex-start; flex-direction: column; }
+            .kpi-grid { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div>
+                <h1>Технические метрики</h1>
+                <div class="meta">Search Latency p95: ежедневно | Checkout Success Rate: каждый час | 05.05.2026, 15:00</div>
+            </div>
+            <div class="meta">Данные обновлены: сегодня, 15:00</div>
+        </header>
+
+        <div class="filters">
+            <div class="filter-item"><span class="filter-label">Период</span><div class="filter-value">05.05.2026</div></div>
+            <div class="filter-item"><span class="filter-label">Исход поисковой сессии</span><div class="filter-value">Все</div></div>
+            <div class="filter-item"><span class="filter-label">Эквайринг</span><div class="filter-value">Все</div></div>
+            <div class="filter-item"><span class="filter-label">Компонент</span><div class="filter-value">Все</div></div>
+            <div class="filter-item"><span class="filter-label">Тип ошибки</span><div class="filter-value">Все</div></div>
+        </div>
+
+        <div class="kpi-grid">
+            <div class="card">
+                <div class="kpi-title">Search Latency p95</div>
+                <div class="kpi-value">2,8 сек</div>
+                <div class="kpi-change up">▼ -0,2 сек к предыдущему дню</div>
+                <div class="kpi-frequency">Частота: ежедневно</div>
+                <div class="status-badge status-ok">Норма</div>
+            </div>
+            <div class="card">
+                <div class="kpi-title">Technical Checkout Success Rate</div>
+                <div class="kpi-value">98,4%</div>
+                <div class="kpi-change down">▼ -0,3 п.п. к предыдущему часу</div>
+                <div class="kpi-frequency">Частота: каждый час</div>
+                <div class="status-badge status-ok">Норма</div>
+            </div>
+            <div class="card">
+                <div class="kpi-title">Поисковые сессии</div>
+                <div class="kpi-value">45,2 тыс.</div>
+                <div class="kpi-change up">▲ +6% к предыдущему дню</div>
+                <div class="kpi-frequency">Частота: ежедневно</div>
+                <div class="status-badge status-ok">Норма</div>
+            </div>
+            <div class="card">
+                <div class="kpi-title">Ошибки checkout</div>
+                <div class="kpi-value">12</div>
+                <div class="kpi-change down">▲ +4 к предыдущему часу</div>
+                <div class="kpi-frequency">Частота: каждый час</div>
+                <div class="status-badge status-warn">Зона внимания</div>
+            </div>
+        </div>
+
+        <div class="charts-grid">
+            <div class="chart-card">
+                <div class="chart-title">Search Latency p95 по исходу сессии</div>
+                <div class="legend">
+                    <div class="legend-item"><span class="legend-marker" style="background:#2563EB"></span>Latency p95, сек</div>
+                    <div class="legend-item"><span class="legend-marker" style="background:#94A3B8"></span>Норма до 3 сек</div>
+                </div>
+                <div id="latency-segments" class="svg-container"></div>
+            </div>
+
+            <div class="chart-card">
+                <div class="chart-title">Checkout Success Rate по эквайрингу</div>
+                <div class="legend">
+                    <div class="legend-item"><span class="legend-marker" style="background:#14B8A6"></span>Success Rate, %</div>
+                    <div class="legend-item"><span class="legend-marker" style="background:#94A3B8"></span>Цель 98%</div>
+                </div>
+                <div id="checkout-acquiring" class="svg-container"></div>
+            </div>
+
+            <div class="chart-card">
+                <div class="chart-title">Latency p95 по часам</div>
+                <div class="legend">
+                    <div class="legend-item"><span class="legend-marker" style="background:#2563EB"></span>Latency p95, сек</div>
+                    <div class="legend-item"><span class="legend-marker" style="background:#94A3B8"></span>3 / 4 / 5 сек</div>
+                </div>
+                <div id="latency-hours" class="svg-container"></div>
+            </div>
+
+            <div class="chart-card">
+                <div class="chart-title">Checkout Success Rate по часам</div>
+                <div class="legend">
+                    <div class="legend-item"><span class="legend-marker" style="background:#14B8A6"></span>Success Rate, %</div>
+                    <div class="legend-item"><span class="legend-marker" style="background:#94A3B8"></span>Цель 98%</div>
+                </div>
+                <div id="checkout-hours" class="svg-container"></div>
+            </div>
+
+            <div class="chart-card">
+                <div class="chart-title">Типы технических ошибок</div>
+                <div class="legend">
+                    <div class="legend-item"><span class="legend-marker" style="background:#DC2626"></span>5xx — 35%</div>
+                    <div class="legend-item"><span class="legend-marker" style="background:#F59E0B"></span>Timeout — 28%</div>
+                    <div class="legend-item"><span class="legend-marker" style="background:#2563EB"></span>Callback error — 22%</div>
+                    <div class="legend-item"><span class="legend-marker" style="background:#14B8A6"></span>Client error — 15%</div>
+                </div>
+                <div id="error-types" class="svg-container compact"></div>
+            </div>
+        </div>
+
+        <div class="card table-card">
+            <div class="chart-title" style="margin-bottom: 16px;">Детализация технических проблем</div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Компонент</th>
+                        <th>Метрика</th>
+                        <th>Текущее значение</th>
+                        <th>Порог</th>
+                        <th>Статус</th>
+                        <th>Действие</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Search Engine</td>
+                        <td>Search Latency p95</td>
+                        <td>2,8 сек</td>
+                        <td>≤ 3 сек</td>
+                        <td><span class="status-badge status-ok">Норма</span></td>
+                        <td>Продолжить ежедневный мониторинг</td>
+                    </tr>
+                    <tr>
+                        <td>Payment Gateway</td>
+                        <td>Checkout Success Rate</td>
+                        <td>97,8%</td>
+                        <td>≥ 98%</td>
+                        <td><span class="status-badge status-warn">Зона внимания</span></td>
+                        <td>Проверить резервный эквайринг и ошибки 3DS</td>
+                    </tr>
+                    <tr>
+                        <td>Checkout Service</td>
+                        <td>Ошибки checkout</td>
+                        <td>12 за час</td>
+                        <td>не выше 8 за час</td>
+                        <td><span class="status-badge status-warn">Требуется анализ</span></td>
+                        <td>Разобрать callback error и timeout</td>
+                    </tr>
+                    <tr>
+                        <td>Booking API</td>
+                        <td>5xx</td>
+                        <td>7 за час</td>
+                        <td>не выше 5 за час</td>
+                        <td><span class="status-badge status-warn">Требуется анализ</span></td>
+                        <td>Проверить логи интеграции с туроператорами</td>
+                    </tr>
+                    <tr>
+                        <td>Frontend</td>
+                        <td>Client error</td>
+                        <td>3 за час</td>
+                        <td>не выше 10 за час</td>
+                        <td><span class="status-badge status-ok">Норма</span></td>
+                        <td>Мониторинг без эскалации</td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+<script>
+const COLORS = {
+    blue: '#2563EB',
+    teal: '#14B8A6',
+    green: '#16A34A',
+    orange: '#F59E0B',
+    red: '#DC2626',
+    gray: '#94A3B8',
+    grid: '#EEF2F7',
+    axis: '#CBD5E1',
+    text: '#1F2937',
+    muted: '#64748B'
+};
+
+function formatRu(value) {
+    return String(value).replace('.', ',');
+}
+
+function renderBarChart(id, { maxY, ticks, yTitle, labels, values, color, valueSuffix = '', target }) {
+    const el = document.getElementById(id);
+    const w = 760, h = 320, pl = 76, pr = 34, pt = 26, pb = 66;
+    const pw = w - pl - pr;
+    const ph = h - pt - pb;
+    const step = pw / labels.length;
+    const bw = Math.min(68, step * 0.52);
+    let svg = `<svg viewBox="0 0 ${w} ${h}" role="img">`;
+
+    for (let i = 0; i <= ticks; i++) {
+        const val = maxY - (maxY / ticks) * i;
+        const y = pt + (ph / ticks) * i;
+        svg += `<line x1="${pl}" y1="${y}" x2="${w - pr}" y2="${y}" stroke="${COLORS.grid}"/>`;
+        svg += `<text x="${pl - 10}" y="${y + 4}" text-anchor="end" class="axis-label">${formatRu(Number(val.toFixed(1)))}</text>`;
+    }
+
+    svg += `<line x1="${pl}" y1="${pt}" x2="${pl}" y2="${h - pb}" class="axis-line"/>`;
+    svg += `<line x1="${pl}" y1="${h - pb}" x2="${w - pr}" y2="${h - pb}" class="axis-line"/>`;
+    svg += `<text x="24" y="${pt + ph / 2}" transform="rotate(-90 24 ${pt + ph / 2})" text-anchor="middle" class="axis-title">${yTitle}</text>`;
+
+    if (target) {
+        const ty = h - pb - (target.value / maxY) * ph;
+        svg += `<line x1="${pl}" y1="${ty}" x2="${w - pr}" y2="${ty}" stroke="${COLORS.gray}" stroke-dasharray="7 5" stroke-width="2"/>`;
+    }
+
+    labels.forEach((label, i) => {
+        const x = pl + step * i + (step - bw) / 2;
+        const bh = (values[i] / maxY) * ph;
+        const y = h - pb - bh;
+        const cx = x + bw / 2;
+        svg += `<rect x="${x}" y="${y}" width="${bw}" height="${bh}" fill="${color}" rx="4"/>`;
+        svg += `<text x="${cx}" y="${Math.max(pt + 14, y - 8)}" text-anchor="middle" class="value-label">${formatRu(values[i])}${valueSuffix}</text>`;
+        svg += `<text x="${cx}" y="${h - pb + 24}" text-anchor="middle" class="axis-label">${label}</text>`;
+    });
+
+    svg += `</svg>`;
+    el.innerHTML = svg;
+}
+
+function renderLineChart(id, { minY = 0, maxY, ticks, yTitle, labels, values, color, targetLines = [] }) {
+    const el = document.getElementById(id);
+    const w = 760, h = 320, pl = 76, pr = 34, pt = 26, pb = 66;
+    const pw = w - pl - pr;
+    const ph = h - pt - pb;
+    const xStep = pw / Math.max(1, labels.length - 1);
+    const span = maxY - minY;
+    const yFor = (value) => h - pb - ((value - minY) / span) * ph;
+    let svg = `<svg viewBox="0 0 ${w} ${h}" role="img">`;
+
+    for (let i = 0; i <= ticks; i++) {
+        const val = maxY - (span / ticks) * i;
+        const y = pt + (ph / ticks) * i;
+        svg += `<line x1="${pl}" y1="${y}" x2="${w - pr}" y2="${y}" stroke="${COLORS.grid}"/>`;
+        svg += `<text x="${pl - 10}" y="${y + 4}" text-anchor="end" class="axis-label">${formatRu(Number(val.toFixed(1)))}</text>`;
+    }
+
+    svg += `<line x1="${pl}" y1="${pt}" x2="${pl}" y2="${h - pb}" class="axis-line"/>`;
+    svg += `<line x1="${pl}" y1="${h - pb}" x2="${w - pr}" y2="${h - pb}" class="axis-line"/>`;
+    svg += `<text x="24" y="${pt + ph / 2}" transform="rotate(-90 24 ${pt + ph / 2})" text-anchor="middle" class="axis-title">${yTitle}</text>`;
+
+    labels.forEach((label, i) => {
+        const x = pl + xStep * i;
+        svg += `<text x="${x}" y="${h - pb + 24}" text-anchor="middle" class="axis-label">${label}</text>`;
+    });
+
+    targetLines.forEach(t => {
+        const y = yFor(t.value);
+        svg += `<line x1="${pl}" y1="${y}" x2="${w - pr}" y2="${y}" stroke="${t.color || COLORS.gray}" stroke-dasharray="7 5" stroke-width="2"/>`;
+    });
+
+    const points = values.map((v, i) => `${pl + xStep * i},${yFor(v)}`).join(' ');
+    svg += `<polyline points="${points}" fill="none" stroke="${color}" stroke-width="3.2"/>`;
+
+    values.forEach((v, i) => {
+        const x = pl + xStep * i;
+        const y = yFor(v);
+        svg += `<circle cx="${x}" cy="${y}" r="4" fill="${color}"/>`;
+    });
+
+    svg += `</svg>`;
+    el.innerHTML = svg;
+}
+
+function renderDonutChart(id, { segments, centerValue, centerTitle }) {
+    const el = document.getElementById(id);
+    const w = 760, h = 300;
+    const cx = 380, cy = 130, r = 88;
+    const circumference = 2 * Math.PI * r;
+    let offset = 0;
+    let svg = `<svg viewBox="0 0 ${w} ${h}" role="img">`;
+
+    svg += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#E5E7EB" stroke-width="32"/>`;
+
+    segments.forEach(seg => {
+        const dash = circumference * (seg.value / 100);
+        svg += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${seg.color}" stroke-width="32" stroke-dasharray="${dash} ${circumference - dash}" stroke-dashoffset="${-offset}" transform="rotate(-90 ${cx} ${cy})"/>`;
+        offset += dash;
+    });
+
+    svg += `<circle cx="${cx}" cy="${cy}" r="58" fill="#FFFFFF"/>`;
+    svg += `<text x="${cx}" y="${cy - 4}" font-size="24" font-weight="700" text-anchor="middle" fill="#1F2937">${centerValue}</text>`;
+    svg += `<text x="${cx}" y="${cy + 18}" font-size="12" text-anchor="middle" fill="#64748B">${centerTitle}</text>`;
+
+    let startX = 96;
+    segments.forEach((seg, i) => {
+        const x = startX + i * 160;
+        svg += `<circle cx="${x}" cy="262" r="7" fill="${seg.color}"/>`;
+        svg += `<text x="${x + 14}" y="266" class="axis-label">${seg.label}: ${seg.value}%</text>`;
+    });
+
+    svg += `</svg>`;
+    el.innerHTML = svg;
+}
+
+renderBarChart('latency-segments', {
+    maxY: 5,
+    ticks: 5,
+    yTitle: 'сек',
+    labels: ['С покупкой', 'Высокое намерение', 'Просмотр'],
+    values: [2.1, 3.4, 1.8],
+    color: COLORS.blue,
+    valueSuffix: ' сек',
+    target: { value: 3 }
+});
+
+renderBarChart('checkout-acquiring', {
+    maxY: 100,
+    ticks: 5,
+    yTitle: '%',
+    labels: ['Основной', 'Резервный'],
+    values: [99.1, 97.8],
+    color: COLORS.teal,
+    valueSuffix: '%',
+    target: { value: 98 }
+});
+
+renderLineChart('latency-hours', {
+    minY: 0,
+    maxY: 5,
+    ticks: 5,
+    yTitle: 'сек',
+    labels: ['08:00', '09:00', '10:00', '11:00', '12:00', '13:00', '14:00', '15:00'],
+    values: [2.4, 2.7, 3.1, 2.8, 2.6, 3.4, 3.0, 2.8],
+    color: COLORS.blue,
+    targetLines: [
+        { value: 3, color: COLORS.gray },
+        { value: 4, color: COLORS.orange },
+        { value: 5, color: COLORS.red }
+    ]
+});
+
+renderLineChart('checkout-hours', {
+    minY: 95,
+    maxY: 100,
+    ticks: 5,
+    yTitle: '%',
+    labels: ['10:00', '11:00', '12:00', '13:00', '14:00', '15:00'],
+    values: [98.9, 98.6, 98.1, 97.6, 98.2, 98.4],
+    color: COLORS.teal,
+    targetLines: [
+        { value: 98, color: COLORS.gray }
+    ]
+});
+
+renderDonutChart('error-types', {
+    centerValue: '100%',
+    centerTitle: 'Ошибки',
+    segments: [
+        { label: '5xx', value: 35, color: COLORS.red },
+        { label: 'Timeout', value: 28, color: COLORS.orange },
+        { label: 'Callback', value: 22, color: COLORS.blue },
+        { label: 'Client', value: 15, color: COLORS.teal }
+    ]
+});
+</script>
+</body>
+</html>

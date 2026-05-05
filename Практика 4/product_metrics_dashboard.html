@@ -1,0 +1,673 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Продуктовые метрики</title>
+    <style>
+        :root {
+            --bg-color: #F6F8FB;
+            --card-bg: #FFFFFF;
+            --text-main: #1F2937;
+            --text-secondary: #64748B;
+            --accent: #2563EB;
+            --accent-extra: #14B8A6;
+            --status-ok: #16A34A;
+            --status-warn: #F59E0B;
+            --status-crit: #DC2626;
+            --border: #E5E7EB;
+            --grid: #EEF2F7;
+        }
+
+        * { box-sizing: border-box; }
+        html, body { min-height: 100%; overflow-y: auto; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 24px;
+        }
+
+        .container { max-width: 1600px; margin: 0 auto; }
+
+        header {
+            margin-bottom: 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            gap: 24px;
+        }
+
+        h1 { font-size: 28px; margin: 0 0 8px 0; }
+        .meta { font-size: 14px; color: var(--text-secondary); }
+
+        .filters {
+            display: flex;
+            gap: 12px;
+            background: var(--card-bg);
+            padding: 16px 24px;
+            border-radius: 12px;
+            margin-bottom: 24px;
+            border: 1px solid var(--border);
+            flex-wrap: wrap;
+        }
+        .filter-item { display: flex; flex-direction: column; gap: 4px; }
+        .filter-label { font-size: 12px; color: var(--text-secondary); font-weight: 600; }
+        .filter-value { font-size: 14px; border: 1px solid var(--border); padding: 6px 12px; border-radius: 6px; background: #fff; min-width: 130px; }
+
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(220px, 1fr));
+            gap: 20px;
+            margin-bottom: 24px;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: 16px;
+            padding: 20px;
+            border: 1px solid var(--border);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+
+        .kpi-title { font-size: 13px; color: var(--text-secondary); margin-bottom: 8px; min-height: 32px; }
+        .kpi-value { font-size: 28px; font-weight: 700; margin-bottom: 4px; }
+        .kpi-change { font-size: 13px; margin-bottom: 8px; }
+        .up { color: var(--status-ok); }
+        .down { color: var(--status-crit); }
+        .warn { color: var(--status-warn); }
+
+        .status-badge {
+            display: inline-block;
+            padding: 4px 10px;
+            border-radius: 100px;
+            font-size: 11px;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+        .status-ok { background: #DCFCE7; color: var(--status-ok); }
+        .status-warn { background: #FEF3C7; color: var(--status-warn); }
+        .status-crit { background: #FEE2E2; color: var(--status-crit); }
+
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 24px;
+            margin-bottom: 24px;
+        }
+
+        .chart-card {
+            background: var(--card-bg);
+            border-radius: 16px;
+            padding: 24px;
+            border: 1px solid var(--border);
+            min-height: 430px;
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+        .full-width { grid-column: span 2; min-height: 430px; }
+        .chart-title { font-size: 16px; font-weight: 600; margin-bottom: 10px; }
+        .chart-subtitle { font-size: 12px; color: var(--text-secondary); margin: -4px 0 12px 0; }
+
+        .legend {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 14px;
+            font-size: 12px;
+            color: var(--text-secondary);
+            margin-bottom: 10px;
+        }
+        .legend-item { display: flex; align-items: center; gap: 6px; }
+        .legend-marker { width: 11px; height: 11px; border-radius: 2px; flex: 0 0 auto; }
+
+        .svg-container { width: 100%; height: 320px; }
+        .svg-container.compact { height: 290px; }
+        svg { width: 100%; height: 100%; display: block; }
+        .axis-label { font-size: 12px; fill: var(--text-secondary); }
+        .axis-title { font-size: 12px; fill: var(--text-secondary); font-weight: 500; }
+        .value-label { font-size: 12px; fill: var(--text-main); font-weight: 600; }
+        .small-label { font-size: 11px; fill: var(--text-secondary); }
+        .grid-line { stroke: var(--grid); stroke-width: 1; }
+        .axis-line { stroke: #CBD5E1; stroke-width: 1.2; }
+
+        .funnel {
+            width: 100%;
+            height: 312px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            gap: 7px;
+            padding: 6px 0;
+        }
+        .funnel-row {
+            display: grid;
+            grid-template-columns: 210px 1fr 86px;
+            align-items: center;
+            gap: 14px;
+            min-height: 48px;
+        }
+        .funnel-label { font-size: 13px; color: var(--text-secondary); text-align: right; }
+        .funnel-bar-wrap { height: 40px; display: flex; justify-content: center; align-items: center; }
+        .funnel-bar {
+            height: 40px;
+            border-radius: 8px;
+            background: linear-gradient(90deg, #2563EB, #14B8A6);
+            color: #fff;
+            font-size: 13px;
+            font-weight: 600;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-width: 126px;
+            box-shadow: inset 0 -1px 0 rgba(0,0,0,0.08);
+        }
+        .funnel-value { font-size: 13px; font-weight: 700; color: var(--text-main); }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+            min-width: 960px;
+        }
+        th { text-align: left; padding: 12px; border-bottom: 2px solid var(--border); color: var(--text-secondary); font-weight: 600; }
+        td { padding: 12px; border-bottom: 1px solid var(--border); }
+        .table-card { margin-top: 24px; overflow-x: auto; }
+        .positive { color: var(--status-ok); font-weight: 600; }
+        .negative { color: var(--status-crit); font-weight: 600; }
+        .warning { color: var(--status-warn); font-weight: 600; }
+
+        @media (max-width: 1200px) {
+            .kpi-grid { grid-template-columns: repeat(2, 1fr); }
+            .charts-grid { grid-template-columns: 1fr; }
+            .full-width { grid-column: span 1; }
+            .funnel-row { grid-template-columns: 170px 1fr 72px; }
+        }
+        @media (max-width: 760px) {
+            body { padding: 16px; }
+            header { align-items: flex-start; flex-direction: column; }
+            .kpi-grid { grid-template-columns: 1fr; }
+            .funnel-row { grid-template-columns: 1fr; gap: 4px; }
+            .funnel-label { text-align: left; }
+            .funnel-bar-wrap { justify-content: flex-start; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div>
+                <h1>Продуктовые метрики</h1>
+                <div class="meta">Мониторинг: еженедельный | Неделя 18, 2026</div>
+            </div>
+            <div class="meta">Данные обновлены: сегодня, 09:15</div>
+        </header>
+
+        <div class="filters">
+            <div class="filter-item"><span class="filter-label">Период</span><div class="filter-value">Неделя 18, 2026</div></div>
+            <div class="filter-item"><span class="filter-label">Устройство</span><div class="filter-value">Все</div></div>
+            <div class="filter-item"><span class="filter-label">Эквайринг</span><div class="filter-value">Все</div></div>
+            <div class="filter-item"><span class="filter-label">Туроператор</span><div class="filter-value">Все</div></div>
+            <div class="filter-item"><span class="filter-label">Тип клиента</span><div class="filter-value">Все</div></div>
+            <div class="filter-item"><span class="filter-label">Этап пути</span><div class="filter-value">Все</div></div>
+        </div>
+
+        <div class="kpi-grid">
+            <div class="card">
+                <div class="kpi-title">CR «выдача → начало оформления»</div>
+                <div class="kpi-value">10,8%</div>
+                <div class="kpi-change up">▲ +0,6 п.п. к прошлой неделе</div>
+                <div class="status-badge status-ok">Норма</div>
+            </div>
+            <div class="card">
+                <div class="kpi-title">CR «создан заказ → оплачено»</div>
+                <div class="kpi-value">72%</div>
+                <div class="kpi-change down">▼ -1,2 п.п. к прошлой неделе</div>
+                <div class="status-badge status-ok">Норма</div>
+            </div>
+            <div class="card">
+                <div class="kpi-title">Confirmation Rate</div>
+                <div class="kpi-value">92%</div>
+                <div class="kpi-change down">▼ -0,8 п.п. к прошлой неделе</div>
+                <div class="status-badge status-ok">Норма</div>
+            </div>
+            <div class="card">
+                <div class="kpi-title">CSAT</div>
+                <div class="kpi-value">84%</div>
+                <div class="kpi-change up">▲ +2 п.п. к прошлой неделе</div>
+                <div class="status-badge status-ok">Норма</div>
+            </div>
+        </div>
+
+        <div class="charts-grid">
+            <div class="chart-card full-width">
+                <div class="chart-title">Воронка продаж</div>
+                                <div class="funnel" aria-label="Воронка продаж">
+                    <div class="funnel-row">
+                        <div class="funnel-label">Выдача</div>
+                        <div class="funnel-bar-wrap"><div class="funnel-bar" style="width:100%">Выдача</div></div>
+                        <div class="funnel-value">100%</div>
+                    </div>
+                    <div class="funnel-row">
+                        <div class="funnel-label">Начало оформления</div>
+                        <div class="funnel-bar-wrap"><div class="funnel-bar" style="width:78%">Начало оформления</div></div>
+                        <div class="funnel-value">10,8%</div>
+                    </div>
+                    <div class="funnel-row">
+                        <div class="funnel-label">Создан заказ</div>
+                        <div class="funnel-bar-wrap"><div class="funnel-bar" style="width:60%">Создан заказ</div></div>
+                        <div class="funnel-value">4,0%</div>
+                    </div>
+                    <div class="funnel-row">
+                        <div class="funnel-label">Оплачено</div>
+                        <div class="funnel-bar-wrap"><div class="funnel-bar" style="width:46%">Оплачено</div></div>
+                        <div class="funnel-value">2,9%</div>
+                    </div>
+                    <div class="funnel-row">
+                        <div class="funnel-label">Подтверждено</div>
+                        <div class="funnel-bar-wrap"><div class="funnel-bar" style="width:36%">Подтверждено</div></div>
+                        <div class="funnel-value">2,65%</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="chart-card">
+                <div class="chart-title">Динамика CR «выдача → начало оформления»</div>
+                <div class="legend"><div class="legend-item"><span class="legend-marker" style="background:#2563EB"></span>CR, %</div><div class="legend-item"><span class="legend-marker" style="background:#94A3B8"></span>Целевой уровень</div></div>
+                <div id="cr1-dynamics" class="svg-container"></div>
+            </div>
+
+            <div class="chart-card">
+                <div class="chart-title">Динамика CR «создан заказ → оплачено»</div>
+                <div class="legend"><div class="legend-item"><span class="legend-marker" style="background:#14B8A6"></span>CR, %</div><div class="legend-item"><span class="legend-marker" style="background:#94A3B8"></span>Целевой уровень</div></div>
+                <div id="cr2-dynamics" class="svg-container"></div>
+            </div>
+
+            <div class="chart-card">
+                <div class="chart-title">CR «выдача → начало» по устройствам</div>
+                <div id="cr1-devices" class="svg-container"></div>
+            </div>
+
+            <div class="chart-card">
+                <div class="chart-title">CR «создан заказ → оплачено» по устройствам</div>
+                <div id="cr2-devices" class="svg-container"></div>
+            </div>
+
+            <div class="chart-card">
+                <div class="chart-title">CR «выдача → начало»: новые и повторные</div>
+                <div class="legend"><div class="legend-item"><span class="legend-marker" style="background:#2563EB"></span>Новые: 8,9%</div><div class="legend-item"><span class="legend-marker" style="background:#93C5FD"></span>Повторные: 13,2%</div></div>
+                <div id="cr1-client-type" class="svg-container compact"></div>
+            </div>
+
+            <div class="chart-card">
+                <div class="chart-title">CR «создан заказ → оплачено»: новые и повторные</div>
+                <div class="legend"><div class="legend-item"><span class="legend-marker" style="background:#14B8A6"></span>Новые: 66%</div><div class="legend-item"><span class="legend-marker" style="background:#5EEAD4"></span>Повторные: 76%</div></div>
+                <div id="cr2-client-type" class="svg-container compact"></div>
+            </div>
+
+            <div class="chart-card">
+                <div class="chart-title">CR «создан заказ → оплачено» по эквайрингу</div>
+                <div id="cr2-acquiring" class="svg-container"></div>
+            </div>
+
+            <div class="chart-card">
+                <div class="chart-title">Confirmation Rate по туроператорам</div>
+                <div id="confirmation-operators" class="svg-container"></div>
+            </div>
+
+            <div class="chart-card">
+                <div class="chart-title">Confirmation Rate: срочные и плановые заказы</div>
+                <div id="confirmation-order-type" class="svg-container"></div>
+            </div>
+
+            <div class="chart-card">
+                <div class="chart-title">CSAT по этапам клиентского пути</div>
+                <div id="csat-stage" class="svg-container"></div>
+            </div>
+
+            <div class="chart-card">
+                <div class="chart-title">CSAT: наличие инцидентов</div>
+                                <div class="legend"><div class="legend-item"><span class="legend-marker" style="background:#DC2626"></span>С инцидентами: 18%</div><div class="legend-item"><span class="legend-marker" style="background:#16A34A"></span>Без инцидентов: 82%</div></div>
+                <div id="csat-incidents" class="svg-container compact"></div>
+            </div>
+        </div>
+
+        <div class="card table-card">
+            <div class="chart-title" style="margin-bottom: 16px;">Детализация по туроператорам</div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Туроператор</th>
+                        <th>Confirmation Rate, %</th>
+                        <th>Отклонение от цели</th>
+                        <th>Средний CSAT, %</th>
+                        <th>Отклонение CSAT</th>
+                        <th>Доля заказов, %</th>
+                        <th>Статус</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr><td>Biblio Globus</td><td>96%</td><td class="positive">+6 п.п.</td><td>88%</td><td class="positive">+8 п.п.</td><td>32%</td><td><span class="status-badge status-ok">Норма</span></td></tr>
+                    <tr><td>Anex Tour</td><td>91%</td><td class="positive">+1 п.п.</td><td>82%</td><td class="positive">+2 п.п.</td><td>24%</td><td><span class="status-badge status-ok">Норма</span></td></tr>
+                    <tr><td>Fun&Sun</td><td>93%</td><td class="positive">+3 п.п.</td><td>85%</td><td class="positive">+5 п.п.</td><td>18%</td><td><span class="status-badge status-ok">Норма</span></td></tr>
+                    <tr><td>Coral Travel</td><td>90%</td><td class="warning">0 п.п.</td><td>80%</td><td class="warning">0 п.п.</td><td>14%</td><td><span class="status-badge status-warn">Зона внимания</span></td></tr>
+                    <tr><td>Tez Tour</td><td>88%</td><td class="negative">-2 п.п.</td><td>79%</td><td class="warning">-1 п.п.</td><td>12%</td><td><span class="status-badge status-warn">Зона внимания</span></td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+
+<script>
+const COLORS = {
+    blue: '#2563EB',
+    teal: '#14B8A6',
+    green: '#16A34A',
+    orange: '#F59E0B',
+    red: '#DC2626',
+    gray: '#94A3B8',
+    grid: '#EEF2F7',
+    axis: '#CBD5E1',
+    text: '#1F2937',
+    muted: '#64748B'
+};
+
+function formatRu(value) {
+    return String(value).replace('.', ',');
+}
+
+function renderLineChart(id, { maxY, ticks, yTitle, labels, series, target }) {
+    const el = document.getElementById(id);
+    const w = 760, h = 320, pl = 72, pr = 32, pt = 28, pb = 64;
+    const pw = w - pl - pr;
+    const ph = h - pt - pb;
+    const xStep = pw / Math.max(1, labels.length - 1);
+    let svg = `<svg viewBox="0 0 ${w} ${h}" role="img">`;
+
+    for (let i = 0; i <= ticks; i++) {
+        const val = maxY - (maxY / ticks) * i;
+        const y = pt + (ph / ticks) * i;
+        svg += `<line x1="${pl}" y1="${y}" x2="${w - pr}" y2="${y}" stroke="${COLORS.grid}"/>`;
+        svg += `<text x="${pl - 10}" y="${y + 4}" text-anchor="end" class="axis-label">${formatRu(Number(val.toFixed(1)))}</text>`;
+    }
+    svg += `<line x1="${pl}" y1="${pt}" x2="${pl}" y2="${h - pb}" class="axis-line"/>`;
+    svg += `<line x1="${pl}" y1="${h - pb}" x2="${w - pr}" y2="${h - pb}" class="axis-line"/>`;
+    svg += `<text x="24" y="${pt + ph / 2}" transform="rotate(-90 24 ${pt + ph / 2})" text-anchor="middle" class="axis-title">${yTitle}</text>`;
+
+    labels.forEach((label, i) => {
+        const x = pl + xStep * i;
+        svg += `<text x="${x}" y="${h - 30}" text-anchor="middle" class="axis-label">${label}</text>`;
+    });
+
+    if (target) {
+        const ty = h - pb - (target.value / maxY) * ph;
+        svg += `<line x1="${pl}" y1="${ty}" x2="${w - pr}" y2="${ty}" stroke="${COLORS.gray}" stroke-dasharray="7 5" stroke-width="2"/>`;
+        if (target.label) {
+            svg += `<text x="${w - pr - 6}" y="${Math.max(pt + 12, ty - 8)}" text-anchor="end" class="small-label">${target.label}</text>`;
+        }
+    }
+
+    series.forEach(s => {
+        const points = s.values.map((v, i) => `${pl + xStep * i},${h - pb - (v / maxY) * ph}`).join(' ');
+        svg += `<polyline points="${points}" fill="none" stroke="${s.color}" stroke-width="3.2"/>`;
+        s.values.forEach((v, i) => {
+            const x = pl + xStep * i;
+            const y = h - pb - (v / maxY) * ph;
+            svg += `<circle cx="${x}" cy="${y}" r="4" fill="${s.color}"/>`;
+        });
+    });
+
+    svg += `</svg>`;
+    el.innerHTML = svg;
+}
+
+function renderBarChart(id, { maxY, ticks, yTitle, labels, values, color, valueSuffix = '%', rotateLabels = false, target }) {
+    const el = document.getElementById(id);
+    const w = 760, h = 320, pl = 76, pr = 28, pt = 26, pb = rotateLabels ? 82 : 58;
+    const pw = w - pl - pr;
+    const ph = h - pt - pb;
+    const step = pw / labels.length;
+    const bw = Math.min(54, step * 0.52);
+    let svg = `<svg viewBox="0 0 ${w} ${h}" role="img">`;
+
+    for (let i = 0; i <= ticks; i++) {
+        const val = maxY - (maxY / ticks) * i;
+        const y = pt + (ph / ticks) * i;
+        svg += `<line x1="${pl}" y1="${y}" x2="${w - pr}" y2="${y}" stroke="${COLORS.grid}"/>`;
+        svg += `<text x="${pl - 10}" y="${y + 4}" text-anchor="end" class="axis-label">${formatRu(Number(val.toFixed(1)))}</text>`;
+    }
+    svg += `<line x1="${pl}" y1="${pt}" x2="${pl}" y2="${h - pb}" class="axis-line"/>`;
+    svg += `<line x1="${pl}" y1="${h - pb}" x2="${w - pr}" y2="${h - pb}" class="axis-line"/>`;
+    svg += `<text x="24" y="${pt + ph / 2}" transform="rotate(-90 24 ${pt + ph / 2})" text-anchor="middle" class="axis-title">${yTitle}</text>`;
+
+    if (target) {
+        const ty = h - pb - (target.value / maxY) * ph;
+        svg += `<line x1="${pl}" y1="${ty}" x2="${w - pr}" y2="${ty}" stroke="${COLORS.gray}" stroke-dasharray="7 5" stroke-width="2"/>`;
+        svg += `<text x="${w - pr - 6}" y="${ty - 8}" text-anchor="end" class="small-label">${target.label}</text>`;
+    }
+
+    labels.forEach((label, i) => {
+        const x = pl + step * i + (step - bw) / 2;
+        const bh = (values[i] / maxY) * ph;
+        const y = h - pb - bh;
+        const cx = x + bw / 2;
+        svg += `<rect x="${x}" y="${y}" width="${bw}" height="${bh}" fill="${color}" rx="4"/>`;
+        svg += `<text x="${cx}" y="${y - 8}" text-anchor="middle" class="value-label">${formatRu(values[i])}${valueSuffix}</text>`;
+        if (rotateLabels) {
+            svg += `<text x="${cx}" y="${h - pb + 18}" transform="rotate(-28 ${cx} ${h - pb + 18})" text-anchor="end" class="axis-label">${label}</text>`;
+        } else {
+            svg += `<text x="${cx}" y="${h - pb + 24}" text-anchor="middle" class="axis-label">${label}</text>`;
+        }
+    });
+
+    svg += `</svg>`;
+    el.innerHTML = svg;
+}
+
+function renderGroupedBarChart(id, { maxY, ticks, yTitle, labels, series, target }) {
+    const el = document.getElementById(id);
+    const w = 760, h = 320, pl = 76, pr = 30, pt = 26, pb = 60;
+    const pw = w - pl - pr;
+    const ph = h - pt - pb;
+    const step = pw / labels.length;
+    const groupWidth = Math.min(92, step * 0.72);
+    const barGap = 10;
+    const bw = (groupWidth - barGap * (series.length - 1)) / series.length;
+    let svg = `<svg viewBox="0 0 ${w} ${h}" role="img">`;
+
+    for (let i = 0; i <= ticks; i++) {
+        const val = maxY - (maxY / ticks) * i;
+        const y = pt + (ph / ticks) * i;
+        svg += `<line x1="${pl}" y1="${y}" x2="${w - pr}" y2="${y}" stroke="${COLORS.grid}"/>`;
+        svg += `<text x="${pl - 10}" y="${y + 4}" text-anchor="end" class="axis-label">${formatRu(Number(val.toFixed(0)))}</text>`;
+    }
+    svg += `<line x1="${pl}" y1="${pt}" x2="${pl}" y2="${h - pb}" class="axis-line"/>`;
+    svg += `<line x1="${pl}" y1="${h - pb}" x2="${w - pr}" y2="${h - pb}" class="axis-line"/>`;
+    svg += `<text x="24" y="${pt + ph / 2}" transform="rotate(-90 24 ${pt + ph / 2})" text-anchor="middle" class="axis-title">${yTitle}</text>`;
+
+    if (target) {
+        const ty = h - pb - (target.value / maxY) * ph;
+        svg += `<line x1="${pl}" y1="${ty}" x2="${w - pr}" y2="${ty}" stroke="${COLORS.gray}" stroke-dasharray="7 5" stroke-width="2"/>`;
+        svg += `<text x="${w - pr - 6}" y="${ty - 8}" text-anchor="end" class="small-label">${target.label}</text>`;
+    }
+
+    labels.forEach((label, i) => {
+        const groupX = pl + step * i + (step - groupWidth) / 2;
+        series.forEach((s, j) => {
+            const x = groupX + j * (bw + barGap);
+            const bh = (s.values[i] / maxY) * ph;
+            const y = h - pb - bh;
+            svg += `<rect x="${x}" y="${y}" width="${bw}" height="${bh}" fill="${s.color}" rx="4"/>`;
+            svg += `<text x="${x + bw / 2}" y="${y - 8}" text-anchor="middle" class="value-label">${formatRu(s.values[i])}%</text>`;
+        });
+        svg += `<text x="${groupX + groupWidth / 2}" y="${h - pb + 24}" text-anchor="middle" class="axis-label">${label}</text>`;
+    });
+
+    svg += `</svg>`;
+    el.innerHTML = svg;
+}
+
+function renderDonutChart(id, { segments, centerTitle = '', centerValue = '' }) {
+    const el = document.getElementById(id);
+    const w = 760, h = 290;
+    const cx = 380, cy = 132, r = 84;
+    const circumference = 2 * Math.PI * r;
+    let offset = 0;
+    let svg = `<svg viewBox="0 0 ${w} ${h}" role="img">`;
+    svg += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#E5E7EB" stroke-width="30"/>`;
+    segments.forEach(seg => {
+        const pct = Math.max(0, Math.min(1, seg.value / 100));
+        const dash = circumference * pct;
+        svg += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${seg.color}" stroke-width="30" stroke-linecap="butt" stroke-dasharray="${dash} ${circumference - dash}" stroke-dashoffset="${-offset}" transform="rotate(-90 ${cx} ${cy})"/>`;
+        offset += dash;
+    });
+    svg += `<circle cx="${cx}" cy="${cy}" r="56" fill="#FFFFFF"/>`;
+    svg += `<text x="${cx}" y="${cy - 4}" font-size="24" font-weight="700" text-anchor="middle" fill="#1F2937">${centerValue}</text>`;
+    svg += `<text x="${cx}" y="${cy + 18}" font-size="12" text-anchor="middle" fill="#64748B">${centerTitle}</text>`;
+    const positions = [220, 540];
+    segments.forEach((seg, i) => {
+        const x = positions[i] || (180 + i*160);
+        svg += `<circle cx="${x}" cy="246" r="7" fill="${seg.color}"/>`;
+        svg += `<text x="${x + 14}" y="250" class="axis-label">${seg.label}: ${seg.value}%</text>`;
+    });
+    svg += `</svg>`;
+    el.innerHTML = svg;
+}
+
+function renderRadialPair(id, { items, maxValue = 100, unit = '%', totalLabel }) {
+    const el = document.getElementById(id);
+    const w = 760, h = 290;
+    let svg = `<svg viewBox="0 0 ${w} ${h}" role="img">`;
+    items.forEach((item, i) => {
+        const cx = i === 0 ? 250 : 510;
+        const cy = 128;
+        const r = 72;
+        const circumference = 2 * Math.PI * r;
+        const pct = Math.max(0, Math.min(1, item.value / maxValue));
+        const dash = circumference * pct;
+        svg += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="#E5E7EB" stroke-width="26"/>`;
+        svg += `<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${item.color}" stroke-width="26" stroke-linecap="round" stroke-dasharray="${dash} ${circumference}" transform="rotate(-90 ${cx} ${cy})"/>`;
+        svg += `<circle cx="${cx}" cy="${cy}" r="46" fill="#FFFFFF"/>`;
+        svg += `<text x="${cx}" y="${cy - 2}" font-size="26" font-weight="700" text-anchor="middle" fill="#1F2937">${formatRu(item.value)}${unit}</text>`;
+        svg += `<text x="${cx}" y="${cy + 22}" font-size="12" text-anchor="middle" fill="#64748B">${item.label}</text>`;
+        svg += `<text x="${cx}" y="${cy + 112}" class="axis-label" text-anchor="middle">${item.description}</text>`;
+    });
+    if (totalLabel) {
+        svg += `<text x="380" y="270" class="small-label" text-anchor="middle">${totalLabel}</text>`;
+    }
+    svg += `</svg>`;
+    el.innerHTML = svg;
+}
+
+renderLineChart('cr1-dynamics', {
+    maxY: 15,
+    ticks: 5,
+    yTitle: 'CR, %',
+    labels: ['W14', 'W15', 'W16', 'W17', 'W18'],
+    series: [{ values: [10.1, 10.6, 10.2, 10.9, 10.8], color: COLORS.blue }],
+    target: { value: 10, label: '' }
+});
+
+renderLineChart('cr2-dynamics', {
+    maxY: 80,
+    ticks: 4,
+    yTitle: 'CR, %',
+    labels: ['W14', 'W15', 'W16', 'W17', 'W18'],
+    series: [{ values: [74, 73, 72.8, 73.2, 72], color: COLORS.teal }],
+    target: { value: 70, label: '' }
+});
+
+renderBarChart('cr1-devices', {
+    maxY: 15,
+    ticks: 5,
+    yTitle: 'CR, %',
+    labels: ['Web', 'iOS', 'Android'],
+    values: [10.2, 12.4, 9.1],
+    color: COLORS.blue,
+    valueSuffix: '%'
+});
+
+renderBarChart('cr2-devices', {
+    maxY: 80,
+    ticks: 4,
+    yTitle: 'CR, %',
+    labels: ['Web', 'iOS', 'Android'],
+    values: [70, 75, 68],
+    color: COLORS.teal,
+    valueSuffix: '%',
+    target: { value: 70, label: '' }
+});
+
+renderRadialPair('cr1-client-type', {
+    maxValue: 15,
+    unit: '%',
+    items: [
+        { label: 'Новые', description: 'Новые пользователи', value: 8.9, color: COLORS.blue },
+        { label: 'Повторные', description: 'Повторные пользователи', value: 13.2, color: '#93C5FD' }
+    ]
+});
+
+renderRadialPair('cr2-client-type', {
+    maxValue: 80,
+    unit: '%',
+    items: [
+        { label: 'Новые', description: 'Новые клиенты', value: 66, color: COLORS.teal },
+        { label: 'Повторные', description: 'Повторные клиенты', value: 76, color: '#5EEAD4' }
+    ]
+});
+
+renderBarChart('cr2-acquiring', {
+    maxY: 80,
+    ticks: 4,
+    yTitle: 'CR, %',
+    labels: ['Основной', 'Резервный'],
+    values: [73, 64],
+    color: COLORS.teal,
+    valueSuffix: '%',
+    target: { value: 70, label: 'Цель 70%' }
+});
+
+renderBarChart('confirmation-operators', {
+    maxY: 100,
+    ticks: 5,
+    yTitle: 'Confirmation Rate, %',
+    labels: ['Anex Tour', 'Coral Travel', 'Biblio Globus', 'Tez Tour', 'Fun&Sun'],
+    values: [91, 90, 96, 88, 93],
+    color: COLORS.teal,
+    valueSuffix: '%',
+    rotateLabels: true,
+    target: { value: 90, label: 'Цель 90%' }
+});
+
+renderBarChart('confirmation-order-type', {
+    maxY: 100,
+    ticks: 5,
+    yTitle: 'Confirmation Rate, %',
+    labels: ['Срочные', 'Плановые'],
+    values: [86, 95],
+    color: COLORS.orange,
+    valueSuffix: '%',
+    target: { value: 90, label: 'Цель 90%' }
+});
+
+renderBarChart('csat-stage', {
+    maxY: 100,
+    ticks: 5,
+    yTitle: 'CSAT, %',
+    labels: ['После оплаты', 'После подтверждения', 'После документов', 'После поддержки'],
+    values: [92, 90, 88, 65],
+    color: COLORS.green,
+    valueSuffix: '%',
+    rotateLabels: true,
+    target: { value: 80, label: 'Цель 80%' }
+});
+
+renderDonutChart('csat-incidents', {
+    centerTitle: 'Структура клиентов',
+    centerValue: '100%',
+    segments: [
+        { label: 'С инцидентами', value: 18, color: COLORS.red },
+        { label: 'Без инцидентов', value: 82, color: COLORS.green }
+    ]
+});
+</script>
+</body>
+</html>

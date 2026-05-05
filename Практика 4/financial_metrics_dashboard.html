@@ -1,0 +1,549 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Финансовые метрики</title>
+    <style>
+        :root {
+            --bg-color: #F6F8FB;
+            --card-bg: #FFFFFF;
+            --text-main: #1F2937;
+            --text-secondary: #64748B;
+            --accent: #2563EB;
+            --accent-extra: #14B8A6;
+            --status-ok: #16A34A;
+            --status-warn: #F59E0B;
+            --status-crit: #DC2626;
+            --border: #E5E7EB;
+            --grid: #EEF2F7;
+        }
+
+        * { box-sizing: border-box; }
+        html, body { min-height: 100%; overflow-y: auto; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif;
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            margin: 0;
+            padding: 24px;
+        }
+
+        .container {
+            max-width: 1600px;
+            margin: 0 auto;
+        }
+
+        header {
+            margin-bottom: 24px;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-end;
+            gap: 24px;
+        }
+
+        h1 { font-size: 28px; margin: 0 0 8px 0; }
+        .meta { font-size: 14px; color: var(--text-secondary); }
+
+        .filters {
+            display: flex;
+            gap: 16px;
+            background: var(--card-bg);
+            padding: 16px 24px;
+            border-radius: 12px;
+            margin-bottom: 24px;
+            border: 1px solid var(--border);
+            flex-wrap: wrap;
+        }
+
+        .filter-item { display: flex; flex-direction: column; gap: 4px; }
+        .filter-label { font-size: 12px; color: var(--text-secondary); font-weight: 600; }
+        .filter-value { font-size: 14px; border: 1px solid var(--border); padding: 6px 12px; border-radius: 6px; background: #fff; min-width: 150px; }
+
+        .kpi-grid {
+            display: grid;
+            grid-template-columns: repeat(3, minmax(240px, 1fr));
+            gap: 20px;
+            margin-bottom: 24px;
+        }
+
+        .card {
+            background: var(--card-bg);
+            border-radius: 16px;
+            padding: 24px;
+            border: 1px solid var(--border);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+        }
+
+        .kpi-title { font-size: 14px; color: var(--text-secondary); margin-bottom: 12px; }
+        .kpi-value { font-size: 32px; font-weight: 700; margin-bottom: 8px; }
+        .kpi-change { font-size: 13px; margin-bottom: 12px; }
+        .kpi-change.up { color: var(--status-ok); }
+        .kpi-change.warn { color: var(--status-warn); }
+        
+        .status-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            border-radius: 100px;
+            font-size: 12px;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+        .status-ok { background: #DCFCE7; color: var(--status-ok); }
+        .status-warn { background: #FEF3C7; color: var(--status-warn); }
+        .status-crit { background: #FEE2E2; color: var(--status-crit); }
+
+        .charts-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 24px;
+            margin-bottom: 24px;
+        }
+
+        .chart-card {
+            background: var(--card-bg);
+            border-radius: 16px;
+            padding: 24px;
+            border: 1px solid var(--border);
+            min-height: 430px;
+        }
+
+        .full-width { grid-column: span 2; min-height: 460px; }
+
+        .chart-header { margin-bottom: 10px; }
+        .chart-title { font-size: 16px; font-weight: 600; margin-bottom: 8px; }
+        
+        .legend {
+            display: flex;
+            gap: 16px;
+            font-size: 12px;
+            margin-bottom: 12px;
+            flex-wrap: wrap;
+            color: var(--text-secondary);
+        }
+        .legend-item { display: flex; align-items: center; gap: 6px; }
+        .legend-marker { width: 11px; height: 11px; border-radius: 2px; flex: 0 0 auto; }
+
+        .svg-container { width: 100%; height: 340px; }
+        svg { width: 100%; height: 100%; display: block; }
+        .axis-label { font-size: 12px; fill: var(--text-secondary); }
+        .axis-title { font-size: 12px; fill: var(--text-secondary); font-weight: 500; }
+        .value-label { font-size: 12px; fill: var(--text-main); font-weight: 600; }
+        .small-label { font-size: 11px; fill: var(--text-secondary); }
+        .grid-line { stroke: var(--grid); stroke-width: 1; }
+        .axis-line { stroke: #CBD5E1; stroke-width: 1.2; }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+            min-width: 920px;
+        }
+        th { text-align: left; padding: 12px; border-bottom: 2px solid var(--border); color: var(--text-secondary); font-weight: 600; }
+        td { padding: 12px; border-bottom: 1px solid var(--border); }
+        .table-card { margin-top: 24px; overflow-x: auto; }
+        .positive { color: var(--status-ok); font-weight: 600; }
+        .negative { color: var(--status-crit); font-weight: 600; }
+        .warning { color: var(--status-warn); font-weight: 600; }
+
+        @media (max-width: 1100px) {
+            .kpi-grid { grid-template-columns: 1fr; }
+            .charts-grid { grid-template-columns: 1fr; }
+            .full-width { grid-column: span 1; }
+            header { align-items: flex-start; flex-direction: column; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header>
+            <div>
+                <h1>Финансовые метрики</h1>
+                <div class="meta">Мониторинг: ежемесячный | Данные обновлены: сегодня, 09:15</div>
+            </div>
+            <div class="meta">Период: Апрель 2026</div>
+        </header>
+
+        <div class="filters">
+            <div class="filter-item">
+                <span class="filter-label">Период</span>
+                <div class="filter-value">Апрель 2026</div>
+            </div>
+            <div class="filter-item">
+                <span class="filter-label">Направление</span>
+                <div class="filter-value">Все направления</div>
+            </div>
+            <div class="filter-item">
+                <span class="filter-label">Канал привлечения</span>
+                <div class="filter-value">Все каналы</div>
+            </div>
+            <div class="filter-item">
+                <span class="filter-label">Тип клиента</span>
+                <div class="filter-value">Все клиенты</div>
+            </div>
+        </div>
+
+        <div class="kpi-grid">
+            <div class="card">
+                <div class="kpi-title">GVM</div>
+                <div class="kpi-value">128 млн ₽</div>
+                <div class="kpi-change up">▲ +4,2% к марту 2026</div>
+                <div class="status-badge status-ok">Норма</div>
+            </div>
+            <div class="card">
+                <div class="kpi-title">Revenue</div>
+                <div class="kpi-value">12,4 млн ₽</div>
+                <div class="kpi-change up">▲ +3,8% к марту 2026</div>
+                <div class="status-badge status-ok">Норма</div>
+            </div>
+            <div class="card">
+                <div class="kpi-title">CAC</div>
+                <div class="kpi-value">3 800 ₽</div>
+                <div class="kpi-change warn">▲ +8,5% к плану</div>
+                <div class="status-badge status-warn">Зона внимания</div>
+            </div>
+        </div>
+
+        <div class="charts-grid">
+            <div class="chart-card full-width">
+                <div class="chart-header">
+                    <div class="chart-title">Динамика GVM и Revenue за последние 6 месяцев</div>
+                    <div class="legend">
+                        <div class="legend-item"><div class="legend-marker" style="background: var(--accent);"></div>GVM, млн ₽</div>
+                        <div class="legend-item"><div class="legend-marker" style="background: var(--accent-extra);"></div>Revenue, млн ₽</div>
+                        <div class="legend-item"><div class="legend-marker" style="background: #94A3B8;"></div>План GVM</div>
+                        <div class="legend-item"><div class="legend-marker" style="background: #F59E0B;"></div>План Revenue</div>
+                    </div>
+                </div>
+                <div class="svg-container">
+                    <svg viewBox="0 0 1000 340" role="img" aria-label="Динамика GVM и Revenue за последние 6 месяцев">
+                        <!-- Plot area: x 72..910, y 30..270 -->
+                        <line x1="72" y1="30" x2="72" y2="270" class="axis-line" />
+                        <line x1="910" y1="30" x2="910" y2="270" class="axis-line" />
+                        <line x1="72" y1="270" x2="910" y2="270" class="axis-line" />
+                        
+                        <!-- Grid and Y labels: left axis GVM 0..150 -->
+                        <line x1="72" y1="270" x2="910" y2="270" class="grid-line" />
+                        <line x1="72" y1="222" x2="910" y2="222" class="grid-line" />
+                        <line x1="72" y1="174" x2="910" y2="174" class="grid-line" />
+                        <line x1="72" y1="126" x2="910" y2="126" class="grid-line" />
+                        <line x1="72" y1="78" x2="910" y2="78" class="grid-line" />
+                        <line x1="72" y1="30" x2="910" y2="30" class="grid-line" />
+                        <text x="58" y="274" class="axis-label" text-anchor="end">0</text>
+                        <text x="58" y="226" class="axis-label" text-anchor="end">30</text>
+                        <text x="58" y="178" class="axis-label" text-anchor="end">60</text>
+                        <text x="58" y="130" class="axis-label" text-anchor="end">90</text>
+                        <text x="58" y="82" class="axis-label" text-anchor="end">120</text>
+                        <text x="58" y="34" class="axis-label" text-anchor="end">150</text>
+                        <text x="24" y="150" class="axis-title" transform="rotate(-90 24 150)" text-anchor="middle">GVM, млн ₽</text>
+
+                        <!-- Right axis Revenue 0..15 -->
+                        <text x="924" y="274" class="axis-label">0</text>
+                        <text x="924" y="226" class="axis-label">3</text>
+                        <text x="924" y="178" class="axis-label">6</text>
+                        <text x="924" y="130" class="axis-label">9</text>
+                        <text x="924" y="82" class="axis-label">12</text>
+                        <text x="924" y="34" class="axis-label">15</text>
+                        <text x="976" y="150" class="axis-title" transform="rotate(90 976 150)" text-anchor="middle">Revenue, млн ₽</text>
+
+                        <!-- Plan lines -->
+                        <line x1="72" y1="78" x2="910" y2="78" stroke="#94A3B8" stroke-width="2" stroke-dasharray="7 5" />
+                        <line x1="72" y1="94" x2="910" y2="94" stroke="#F59E0B" stroke-width="2" stroke-dasharray="2 6" opacity="0.95" />
+
+                        <!-- X labels -->
+                        <text x="100" y="302" class="axis-label" text-anchor="middle">Ноя 2025</text>
+                        <text x="260" y="302" class="axis-label" text-anchor="middle">Дек 2025</text>
+                        <text x="420" y="302" class="axis-label" text-anchor="middle">Янв 2026</text>
+                        <text x="580" y="302" class="axis-label" text-anchor="middle">Фев 2026</text>
+                        <text x="740" y="302" class="axis-label" text-anchor="middle">Мар 2026</text>
+                        <text x="900" y="302" class="axis-label" text-anchor="middle">Апр 2026</text>
+                        <text x="491" y="328" class="axis-title" text-anchor="middle">Последние 6 месяцев</text>
+
+                        <!-- Lines. GVM scale 0..150; Revenue scale 0..15, both mapped to 30..270 -->
+                        <polyline points="100,129 260,121 420,112 580,94 740,76 900,65" fill="none" stroke="#2563EB" stroke-width="3.5" />
+                        <polyline points="100,144 260,148 420,142 580,128 740,107 900,72" fill="none" stroke="#14B8A6" stroke-width="3.5" />
+                        <circle cx="100" cy="129" r="4" fill="#2563EB" />
+                        <circle cx="260" cy="121" r="4" fill="#2563EB" />
+                        <circle cx="420" cy="112" r="4" fill="#2563EB" />
+                        <circle cx="580" cy="94" r="4" fill="#2563EB" />
+                        <circle cx="740" cy="76" r="4" fill="#2563EB" />
+                        <circle cx="900" cy="65" r="4" fill="#2563EB" />
+                        <circle cx="100" cy="144" r="4" fill="#14B8A6" />
+                        <circle cx="260" cy="148" r="4" fill="#14B8A6" />
+                        <circle cx="420" cy="142" r="4" fill="#14B8A6" />
+                        <circle cx="580" cy="128" r="4" fill="#14B8A6" />
+                        <circle cx="740" cy="107" r="4" fill="#14B8A6" />
+                        <circle cx="900" cy="72" r="4" fill="#14B8A6" />
+                    </svg>
+                </div>
+            </div>
+
+            <div class="chart-card">
+                <div class="chart-title">GVM по направлениям</div>
+                <div class="legend">
+                    <div class="legend-item"><div class="legend-marker" style="background: var(--accent);"></div>млн ₽</div>
+                </div>
+                <div class="svg-container">
+                    <svg viewBox="0 0 500 340" role="img" aria-label="GVM по направлениям">
+                        <!-- Plot area: x 72..460 y 30..270, max 60 -->
+                        <line x1="72" y1="30" x2="72" y2="270" class="axis-line" />
+                        <line x1="72" y1="270" x2="460" y2="270" class="axis-line" />
+                        <line x1="72" y1="270" x2="460" y2="270" class="grid-line" />
+                        <line x1="72" y1="210" x2="460" y2="210" class="grid-line" />
+                        <line x1="72" y1="150" x2="460" y2="150" class="grid-line" />
+                        <line x1="72" y1="90" x2="460" y2="90" class="grid-line" />
+                        <line x1="72" y1="30" x2="460" y2="30" class="grid-line" />
+                        <text x="60" y="274" class="axis-label" text-anchor="end">0</text>
+                        <text x="60" y="214" class="axis-label" text-anchor="end">15</text>
+                        <text x="60" y="154" class="axis-label" text-anchor="end">30</text>
+                        <text x="60" y="94" class="axis-label" text-anchor="end">45</text>
+                        <text x="60" y="34" class="axis-label" text-anchor="end">60</text>
+                        <text x="24" y="150" class="axis-title" transform="rotate(-90 24 150)" text-anchor="middle">GVM, млн ₽</text>
+
+                        <rect x="92" y="53" width="38" height="217" fill="#2563EB" rx="4" />
+                        <text x="111" y="46" class="value-label" text-anchor="middle">54,2</text>
+                        <text x="111" y="294" class="axis-label" text-anchor="middle">Турция</text>
+
+                        <rect x="160" y="139" width="38" height="131" fill="#2563EB" rx="4" />
+                        <text x="179" y="132" class="value-label" text-anchor="middle">32,8</text>
+                        <text x="179" y="294" class="axis-label" text-anchor="middle">ОАЭ</text>
+
+                        <rect x="228" y="184" width="38" height="86" fill="#2563EB" rx="4" />
+                        <text x="247" y="177" class="value-label" text-anchor="middle">21,5</text>
+                        <text x="247" y="294" class="axis-label" text-anchor="middle">Египет</text>
+
+                        <rect x="296" y="192" width="38" height="78" fill="#2563EB" rx="4" />
+                        <text x="315" y="185" class="value-label" text-anchor="middle">19,5</text>
+                        <text x="315" y="294" class="axis-label" text-anchor="middle">Россия</text>
+
+                        <rect x="364" y="222" width="38" height="48" fill="#2563EB" rx="4" />
+                        <text x="383" y="215" class="value-label" text-anchor="middle">12,0</text>
+                        <text x="383" y="294" class="axis-label" text-anchor="middle">Таиланд</text>
+
+                        <rect x="432" y="224" width="28" height="46" fill="#2563EB" rx="4" />
+                        <text x="446" y="217" class="value-label" text-anchor="middle">11,5</text>
+                        <text x="446" y="294" class="axis-label" text-anchor="middle">Прочие</text>
+                    </svg>
+                </div>
+            </div>
+
+            <div class="chart-card">
+                <div class="chart-title">Revenue по каналам привлечения</div>
+                <div class="legend">
+                    <div class="legend-item"><div class="legend-marker" style="background: var(--accent-extra);"></div>млн ₽</div>
+                </div>
+                <div class="svg-container">
+                    <svg viewBox="0 0 500 340" role="img" aria-label="Revenue по каналам привлечения">
+                        <!-- Plot area x 72..460 y 30..270, max 5 -->
+                        <line x1="72" y1="30" x2="72" y2="270" class="axis-line" />
+                        <line x1="72" y1="270" x2="460" y2="270" class="axis-line" />
+                        <line x1="72" y1="270" x2="460" y2="270" class="grid-line" />
+                        <line x1="72" y1="222" x2="460" y2="222" class="grid-line" />
+                        <line x1="72" y1="174" x2="460" y2="174" class="grid-line" />
+                        <line x1="72" y1="126" x2="460" y2="126" class="grid-line" />
+                        <line x1="72" y1="78" x2="460" y2="78" class="grid-line" />
+                        <line x1="72" y1="30" x2="460" y2="30" class="grid-line" />
+                        <text x="60" y="274" class="axis-label" text-anchor="end">0</text>
+                        <text x="60" y="226" class="axis-label" text-anchor="end">1</text>
+                        <text x="60" y="178" class="axis-label" text-anchor="end">2</text>
+                        <text x="60" y="130" class="axis-label" text-anchor="end">3</text>
+                        <text x="60" y="82" class="axis-label" text-anchor="end">4</text>
+                        <text x="60" y="34" class="axis-label" text-anchor="end">5</text>
+                        <text x="24" y="150" class="axis-title" transform="rotate(-90 24 150)" text-anchor="middle">Revenue, млн ₽</text>
+
+                        <rect x="89" y="54" width="32" height="216" fill="#14B8A6" rx="4" />
+                        <text x="105" y="47" class="value-label" text-anchor="middle">4,5</text>
+                        <text x="105" y="295" class="axis-label" text-anchor="end" transform="rotate(-30 105 295)">Organic Search</text>
+
+                        <rect x="151" y="116" width="32" height="154" fill="#14B8A6" rx="4" />
+                        <text x="167" y="109" class="value-label" text-anchor="middle">3,2</text>
+                        <text x="167" y="295" class="axis-label" text-anchor="end" transform="rotate(-30 167 295)">Paid Search</text>
+
+                        <rect x="213" y="169" width="32" height="101" fill="#14B8A6" rx="4" />
+                        <text x="229" y="162" class="value-label" text-anchor="middle">2,1</text>
+                        <text x="229" y="295" class="axis-label" text-anchor="end" transform="rotate(-30 229 295)">Paid Social</text>
+
+                        <rect x="275" y="198" width="32" height="72" fill="#14B8A6" rx="4" />
+                        <text x="291" y="191" class="value-label" text-anchor="middle">1,5</text>
+                        <text x="291" y="295" class="axis-label" text-anchor="end" transform="rotate(-30 291 295)">CRM</text>
+
+                        <rect x="337" y="232" width="32" height="38" fill="#14B8A6" rx="4" />
+                        <text x="353" y="225" class="value-label" text-anchor="middle">0,8</text>
+                        <text x="353" y="295" class="axis-label" text-anchor="end" transform="rotate(-30 353 295)">Affiliate</text>
+
+                        <rect x="399" y="256" width="32" height="14" fill="#14B8A6" rx="4" />
+                        <text x="415" y="249" class="value-label" text-anchor="middle">0,3</text>
+                        <text x="415" y="295" class="axis-label" text-anchor="end" transform="rotate(-30 415 295)">Direct</text>
+                    </svg>
+                </div>
+            </div>
+
+            <div class="chart-card">
+                <div class="chart-title">GVM по новым и повторным клиентам</div>
+                <div class="legend">
+                    <div class="legend-item"><div class="legend-marker" style="background: #2563EB;"></div>Новые: 45 млн ₽</div>
+                    <div class="legend-item"><div class="legend-marker" style="background: #93C5FD;"></div>Повторные: 83 млн ₽</div>
+                </div>
+                <div class="svg-container">
+                    <svg viewBox="0 0 500 340" role="img" aria-label="GVM по новым и повторным клиентам">
+                        <!-- Donut chart with values in legend and center -->
+                        <circle cx="250" cy="150" r="86" fill="none" stroke="#93C5FD" stroke-width="44" />
+                        <!-- share new 35.2%; dash length approx 190 of circumference 540 -->
+                        <circle cx="250" cy="150" r="86" fill="none" stroke="#2563EB" stroke-width="44" stroke-dasharray="190 540" stroke-linecap="round" transform="rotate(-90 250 150)" />
+                        <circle cx="250" cy="150" r="54" fill="#FFFFFF" />
+                        <text x="250" y="142" font-size="22" font-weight="700" text-anchor="middle" fill="#1F2937">128 млн ₽</text>
+                        <text x="250" y="164" font-size="12" text-anchor="middle" fill="#64748B">итого GVM</text>
+                        <text x="132" y="292" class="axis-label">Новые клиенты — 45 млн ₽ (35%)</text>
+                        <text x="132" y="318" class="axis-label">Повторные клиенты — 83 млн ₽ (65%)</text>
+                    </svg>
+                </div>
+            </div>
+
+            <div class="chart-card">
+                <div class="chart-title">Revenue по новым и повторным клиентам</div>
+                <div class="legend">
+                    <div class="legend-item"><div class="legend-marker" style="background: #14B8A6;"></div>Новые: 4,1 млн ₽</div>
+                    <div class="legend-item"><div class="legend-marker" style="background: #5EEAD4;"></div>Повторные: 8,3 млн ₽</div>
+                </div>
+                <div class="svg-container">
+                    <svg viewBox="0 0 500 340" role="img" aria-label="Revenue по новым и повторным клиентам">
+                        <circle cx="250" cy="150" r="86" fill="none" stroke="#5EEAD4" stroke-width="44" />
+                        <!-- share new 33%; dash length approx 178 of circumference 540 -->
+                        <circle cx="250" cy="150" r="86" fill="none" stroke="#14B8A6" stroke-width="44" stroke-dasharray="178 540" stroke-linecap="round" transform="rotate(-90 250 150)" />
+                        <circle cx="250" cy="150" r="54" fill="#FFFFFF" />
+                        <text x="250" y="142" font-size="22" font-weight="700" text-anchor="middle" fill="#1F2937">12,4 млн ₽</text>
+                        <text x="250" y="164" font-size="12" text-anchor="middle" fill="#64748B">итого Revenue</text>
+                        <text x="132" y="292" class="axis-label">Новые клиенты — 4,1 млн ₽ (33%)</text>
+                        <text x="132" y="318" class="axis-label">Повторные клиенты — 8,3 млн ₽ (67%)</text>
+                    </svg>
+                </div>
+            </div>
+
+            <div class="chart-card full-width">
+                <div class="chart-title">CAC по каналам привлечения</div>
+                <div class="legend">
+                    <div class="legend-item"><div class="legend-marker" style="background: #F59E0B;"></div>CAC, ₽</div>
+                    <div class="legend-item"><div class="legend-marker" style="background: #94A3B8;"></div>Плановый CAC: 3 500 ₽</div>
+                </div>
+                <div class="svg-container">
+                    <svg viewBox="0 0 1000 340" role="img" aria-label="CAC по каналам привлечения">
+                        <!-- Plot x 72..940 y 30..270 max 6000 -->
+                        <line x1="72" y1="30" x2="72" y2="270" class="axis-line" />
+                        <line x1="72" y1="270" x2="940" y2="270" class="axis-line" />
+                        <line x1="72" y1="270" x2="940" y2="270" class="grid-line" />
+                        <line x1="72" y1="210" x2="940" y2="210" class="grid-line" />
+                        <line x1="72" y1="150" x2="940" y2="150" class="grid-line" />
+                        <line x1="72" y1="90" x2="940" y2="90" class="grid-line" />
+                        <line x1="72" y1="30" x2="940" y2="30" class="grid-line" />
+                        <text x="58" y="274" class="axis-label" text-anchor="end">0</text>
+                        <text x="58" y="214" class="axis-label" text-anchor="end">1 500</text>
+                        <text x="58" y="154" class="axis-label" text-anchor="end">3 000</text>
+                        <text x="58" y="94" class="axis-label" text-anchor="end">4 500</text>
+                        <text x="58" y="34" class="axis-label" text-anchor="end">6 000</text>
+                        <text x="24" y="150" class="axis-title" transform="rotate(-90 24 150)" text-anchor="middle">CAC, ₽</text>
+                        <line x1="72" y1="130" x2="940" y2="130" stroke="#94A3B8" stroke-dasharray="7 5" stroke-width="2" />
+                        <text x="930" y="124" class="small-label" text-anchor="end">План: 3 500 ₽</text>
+
+                        <rect x="125" y="62" width="48" height="208" fill="#F59E0B" rx="4" />
+                        <text x="149" y="55" class="value-label" text-anchor="middle">5 200</text>
+                        <text x="149" y="300" class="axis-label" text-anchor="end" transform="rotate(-25 149 300)">Paid Search</text>
+
+                        <rect x="255" y="118" width="48" height="152" fill="#F59E0B" rx="4" />
+                        <text x="279" y="111" class="value-label" text-anchor="middle">3 800</text>
+                        <text x="279" y="300" class="axis-label" text-anchor="end" transform="rotate(-25 279 300)">Paid Social</text>
+
+                        <rect x="385" y="154" width="48" height="116" fill="#F59E0B" rx="4" />
+                        <text x="409" y="147" class="value-label" text-anchor="middle">2 900</text>
+                        <text x="409" y="300" class="axis-label" text-anchor="end" transform="rotate(-25 409 300)">Affiliate</text>
+
+                        <rect x="515" y="248" width="48" height="22" fill="#F59E0B" rx="4" />
+                        <text x="539" y="241" class="value-label" text-anchor="middle">550</text>
+                        <text x="539" y="300" class="axis-label" text-anchor="end" transform="rotate(-25 539 300)">CRM</text>
+
+                        <rect x="645" y="262" width="48" height="8" fill="#F59E0B" rx="4" />
+                        <text x="669" y="255" class="value-label" text-anchor="middle">200</text>
+                        <text x="669" y="300" class="axis-label" text-anchor="end" transform="rotate(-25 669 300)">Organic Search</text>
+
+                        <rect x="775" y="258" width="48" height="12" fill="#F59E0B" rx="4" />
+                        <text x="799" y="251" class="value-label" text-anchor="middle">300</text>
+                        <text x="799" y="300" class="axis-label" text-anchor="end" transform="rotate(-25 799 300)">Direct</text>
+                    </svg>
+                </div>
+            </div>
+        </div>
+
+        <div class="card table-card">
+            <div class="chart-title" style="margin-bottom: 16px;">Таблица детализации по направлениям</div>
+            <table>
+                <thead>
+                    <tr>
+                        <th>Направление</th>
+                        <th>GVM, млн ₽</th>
+                        <th>Revenue, млн ₽</th>
+                        <th>CAC, ₽</th>
+                        <th>Отклонение GVM от плана</th>
+                        <th>Отклонение Revenue от плана</th>
+                        <th>Статус</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    <tr>
+                        <td>Турция</td>
+                        <td>54,2</td>
+                        <td>5,1</td>
+                        <td>3 450</td>
+                        <td class="positive">+6,3%</td>
+                        <td class="positive">+4,8%</td>
+                        <td><span class="status-badge status-ok">Норма</span></td>
+                    </tr>
+                    <tr>
+                        <td>ОАЭ</td>
+                        <td>32,8</td>
+                        <td>3,2</td>
+                        <td>4 100</td>
+                        <td class="positive">+2,1%</td>
+                        <td class="warning">-3,5%</td>
+                        <td><span class="status-badge status-warn">Зона внимания</span></td>
+                    </tr>
+                    <tr>
+                        <td>Египет</td>
+                        <td>21,5</td>
+                        <td>2,1</td>
+                        <td>3 900</td>
+                        <td class="warning">-4,2%</td>
+                        <td class="positive">+1,0%</td>
+                        <td><span class="status-badge status-warn">Зона внимания</span></td>
+                    </tr>
+                    <tr>
+                        <td>Россия</td>
+                        <td>19,5</td>
+                        <td>2,0</td>
+                        <td>2 800</td>
+                        <td class="positive">+1,7%</td>
+                        <td class="positive">+2,5%</td>
+                        <td><span class="status-badge status-ok">Норма</span></td>
+                    </tr>
+                    <tr>
+                        <td>Таиланд</td>
+                        <td>12,0</td>
+                        <td>1,0</td>
+                        <td>3 600</td>
+                        <td class="negative">-12,0%</td>
+                        <td class="negative">-9,5%</td>
+                        <td><span class="status-badge status-crit">Аномалия</span></td>
+                    </tr>
+                    <tr>
+                        <td>Прочие</td>
+                        <td>11,5</td>
+                        <td>1,0</td>
+                        <td>3 100</td>
+                        <td class="positive">+0,8%</td>
+                        <td class="warning">-2,2%</td>
+                        <td><span class="status-badge status-ok">Норма</span></td>
+                    </tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</body>
+</html>
